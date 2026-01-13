@@ -94,7 +94,7 @@ ws_rate_limiter = RateLimiter(max_requests=1000, window_seconds=60)
 # ============================================================================
 
 MAX_MESSAGE_SIZE = int(os.getenv("MAX_MESSAGE_SIZE", 1024 * 100))  # 100KB default
-MAX_CONNECTIONS = int(os.getenv("MAX_CONNECTIONS", 1000))
+MAX_CONNECTIONS = int(os.getenv("MAX_CONNECTIONS", 2))
 WS_AUTH_TIMEOUT = int(os.getenv("WS_AUTH_TIMEOUT", 5))
 
 # ============================================================================
@@ -107,55 +107,6 @@ identity_keys: Dict[str, str] = {}
 # ============================================================================
 # AUTHENTICATED ENDPOINTS
 # ============================================================================
-
-@app.post("/register")
-async def register_client(
-    client_id: str,
-    public_key: str,
-    x_api_key: str = Header(..., alias="X-API-Key")
-):
-    """
-    Register a client's long-term identity public key.
-    Requires valid API key authentication.
-    """
-    # Rate limiting
-    if not rate_limiter.is_allowed(client_id):
-        raise HTTPException(status_code=429, detail="Rate limit exceeded")
-    
-    # Input validation
-    if not client_id or len(client_id) > 64:
-        raise HTTPException(status_code=400, detail="Invalid client_id")
-    
-    if not client_id.replace("_", "").replace("-", "").isalnum():
-        raise HTTPException(status_code=400, detail="client_id must be alphanumeric")
-    
-    if not public_key or len(public_key) > 2048:
-        raise HTTPException(status_code=400, detail="Invalid public_key")
-    
-    if not verify_api_key(client_id, x_api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    identity_keys[client_id] = public_key
-    return {"status": "registered", "client_id": client_id}
-
-@app.get("/public-key/{client_id}")
-async def get_public_key(
-    client_id: str,
-    x_api_key: str = Header(..., alias="X-API-Key")
-):
-    """Get a client's identity public key (requires authentication)"""
-    # Rate limiting
-    if not rate_limiter.is_allowed(client_id):
-        raise HTTPException(status_code=429, detail="Rate limit exceeded")
-    
-    # Verify the requester has a valid API key (any valid key can query)
-    if x_api_key not in VALID_API_KEYS.values():
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    if client_id not in identity_keys:
-        raise HTTPException(status_code=404, detail="Client not found")
-    
-    return {"client_id": client_id, "public_key": identity_keys[client_id]}
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
