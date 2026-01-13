@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse #remove in production
 from typing import Dict, Optional
 import json
 import asyncio
@@ -16,6 +17,11 @@ load_dotenv()  # Load environment variables from .env file
 app = FastAPI()
 
 
+# Store last 50 messages for the web monitor
+traffic_logs = []
+MAX_LOGS = 50
+
+#Delete this functionnality in production, we only want to monitor for demonstation purposes
 
 # ============================================================================
 # CORS CONFIGURATION
@@ -204,7 +210,23 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     continue
                 
                 print(f"[SERVER] Relaying {msg_type} from {client_id} to {recipient_id}")
-                
+
+
+                # Remove in production this is only to show the class cypertext on server
+                log_entry = {
+                        "timestamp": time.strftime("%H:%M:%S"),
+                        "from": client_id,
+                        "to": recipient_id,
+                        "type": msg_type,
+                        "ciphertext": message.get("ciphertext", "N/A (Key Exchange)"),
+                        "exchange_id": message.get("exchange_id", "N/A")
+                                }
+                traffic_logs.insert(0, log_entry)
+                if len(traffic_logs) > MAX_LOGS:
+                    traffic_logs.pop()
+
+
+                # ---------------------------       
                 # IMMEDIATE RELAY - no storage
                 if recipient_id in connections:
                     await connections[recipient_id].send_text(data)
@@ -264,6 +286,56 @@ async def health():
         "connected_clients": len(connections),
         "max_connections": MAX_CONNECTIONS
     }
+
+
+
+@app.get("/monitor", response_class=HTMLResponse)
+async def get_monitor_page():
+    """Returns a simple HTML page to view traffic logs"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>E2EE Traffic Monitor</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #eee; padding: 20px; }
+            .log-entry { background: #2d2d2d; border-left: 5px solid #0078d4; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+            .meta { color: #888; font-size: 0.8em; }
+            .cipher { color: #00ff41; word-break: break-all; font-family: monospace; background: #000; padding: 5px; display: block; margin-top: 5px; }
+            .header { display: flex; justify-content: space-between; align-items: center; }
+            .badge { background: #444; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; }
+        </style>
+        <script>
+            async function updateLogs() {
+                const res = await fetch('/api/traffic');
+                const data = await res.json();
+                const container = document.getElementById('logs');
+                container.innerHTML = data.map(log => `
+                    <div class="log-entry">
+                        <div class="header">
+                            <span><strong>${log.from}</strong> &rarr; <strong>${log.to}</strong></span>
+                            <span class="badge">${log.type}</span>
+                        </div>
+                        <div class="meta">Time: ${log.timestamp} | ID: ${log.exchange_id}</div>
+                        <code class="cipher">${log.ciphertext}</code>
+                    </div>
+                `).join('');
+            }
+            setInterval(updateLogs, 1000); // Refresh every second
+        </script>
+    </head>
+    <body>
+        <h1>E2EE Live Traffic Monitor</h1>
+        <p>This server only relays the following encrypted data. It cannot read the content.</p>
+        <div id="logs">Waiting for traffic...</div>
+    </body>
+    </html>
+    """
+
+@app.get("/api/traffic")
+async def get_traffic_api():
+    """API endpoint for the HTML monitor to fetch logs"""
+    return traffic_logs
 
 
 if __name__ == "__main__":
