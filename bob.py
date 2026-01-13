@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Bob's own PRIVATE key
+# Bob's own PRIVATE key (keep this secret, i have exposed here for demo)
 BOB_PRIV = b'-----BEGIN PRIVATE KEY-----\nMIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDAYk3H6M99En6ECLp9i\nXzDVWObh5TbIpGs8//7dmROBXd9KTO+QqrmJmTz0UEjymlOhZANiAAT/T8GIKodo\nANiSpAEMbNflaxVNKVPOP2sC1GUSl621mWye3hFkJMpeunYbnk/e+FXx7miJBWIP\nC2iehWqzhBaOGNoIrWWkbB1/Xmvco4FAKAci2ih0If8ZpxRBQB8X8lM=\n-----END PRIVATE KEY-----\n'
 
 # Alice's PUBLIC key (Bob trusts this key only)
